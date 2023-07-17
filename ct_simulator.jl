@@ -18,338 +18,29 @@ end
 # ╠═╡ show_logs = false
 begin
 	using Pkg; Pkg.activate(temp = true)
-	Pkg.add(["ImagePhantoms", "MIRTjim", "Unitful", "ImageGeoms", "CairoMakie", "PlutoUI", "Sinograms", "AxisArrays"])
+	Pkg.add(["ImagePhantoms", "MIRTjim", "Unitful", "ImageGeoms", "CairoMakie", "PlutoUI", "Sinograms", "AxisArrays", "DataFrames", "CSV", "Interpolations"])
 	Pkg.add(url = "https://github.com/Dale-Black/Attenuations.jl")
 
 	using ImagePhantoms
-	using MIRTjim: jim
+	using MIRTjim
 	using Unitful: mm, cm, unit, °, ustrip, g
 	using ImageGeoms: ImageGeom, MaskCircle
 	using CairoMakie
 	using PlutoUI
 	using Sinograms
 	using AxisArrays
-	# using FFAST
+	using DataFrames
+	using CSV
+	using Interpolations
 	using Attenuations
 end
 
 # ╔═╡ 2282b1df-c798-47c9-8e8f-01282dac6de0
 TableOfContents()
 
-# ╔═╡ 1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
-md"""
-# Prepare Materials
-
-The linear attenuation coefficient (often symbolized by the Greek letter μ) of a material describes how much a beam of x-ray or gamma radiation is attenuated (i.e., reduced in intensity) by that material. It is a measure of the probability per unit path length that a photon will interact with the material and lose energy.
-
-The unit of the linear attenuation coefficient is typically inverse length (1/length), such as inverse centimeters (cm⁻¹). A higher value of the linear attenuation coefficient means the material is more effective at attenuating the radiation.
-
-In the context of medical imaging, for example, materials like bone that have high linear attenuation coefficients appear white on an x-ray image because they absorb more of the x-ray photons, while materials like air and soft tissues that have lower coefficients appear darker because more of the x-rays pass through them.
-
-The linear attenuation coefficient depends on the energy of the radiation, as well as the atomic number and density of the material.
-"""
-
-# ╔═╡ ae2e029b-0590-4ed4-911d-9d4a80dea2af
-energies = [80keV, 100keV, 120keV, 135keV]
-
-# ╔═╡ fa5406de-baa2-4f66-b883-2c551ec813b8
-axs = AxisArrays.Axis{:energy}(energies)
-
-# ╔═╡ bb1f98c9-7163-4eaa-a1a5-8e6009a53870
-ax = AxisArrays.Axis{:energy}(100keV)
-
-# ╔═╡ 1e62720c-e9bb-4eec-a7b9-e39e6731c574
-md"""
-## Water
-"""
-
-# ╔═╡ 1fc443ff-39a6-4f82-a582-6aa35ddd064f
-water_lacs = μ(Materials.water, energies)
-
-# ╔═╡ 6deb0f71-a009-4ac0-b48a-ec334280eaec
-function convert_hu(lacs, energies)
-    values = [1000 .* ((lacs[AxisArrays.Axis{:energy}(e)] ./ water_lacs[AxisArrays.Axis{:energy}(e)]) .- 1) for e in energies]
-    AxisArray(values, axs)
-end
-
-# ╔═╡ 2d3c740d-da12-4f61-899e-ee5252e33b48
-water_hus = convert_hu(water_lacs, energies)
-
-# ╔═╡ 8728f157-87c1-4a5e-a376-9f71f9e3d82a
-water_hus[ax]
-
-# ╔═╡ 1f5b5c39-a125-45bd-b046-6f11060c2d78
-md"""
-## Air
-"""
-
-# ╔═╡ 6e3577ae-3ea6-4ce0-9f2d-381111aa05d2
-air_lacs = μ(Materials.air, energies)
-
-# ╔═╡ 9e7cae05-ac89-4ba7-a5c9-2a8e102ecb39
-air_hus = convert_hu(air_lacs, energies)
-
-# ╔═╡ 482c2bf8-1234-4e08-ac2f-7f40dda8a1f4
-air_hus[ax]
-
-# ╔═╡ 5a75e9ae-bd8e-4a15-9690-c00d95749f41
-md"""
-## Lung
-"""
-
-# ╔═╡ 1ed21aef-14bc-49a9-a397-c6c5d15e7c31
-lung_tissue_lacs = μ(Materials.lung, energies)
-
-# ╔═╡ 8c3dcf4f-c3d5-444e-8693-e487e1ed54e5
-lung_lacs = AxisArray((0.75*air_lacs) + (0.25*lung_tissue_lacs), axs)
-
-# ╔═╡ cc2b185d-e8b4-4283-a9d2-5af5755606d0
-lung_hus = convert_hu(lung_lacs, energies)
-
-# ╔═╡ 9a54542a-d333-4b08-ad8e-17be90b8b0fc
-lung_hus[ax]
-
-# ╔═╡ 6719f8e0-1668-4e6e-bcfb-033e9fdf3a01
-md"""
-## Myocardium
-"""
-
-# ╔═╡ 7f1365a6-a73b-40a7-8b4b-bcf52eaf4161
-myocardium_lacs = μ(Materials.muscle, energies)
-
-# ╔═╡ 16ef63ae-76e2-42e0-9e9b-7e48ce4372a0
-myocardium_hus = convert_hu(myocardium_lacs, energies)
-
-# ╔═╡ 90249637-5e97-4d2b-bd80-71fbf0ac3c2d
-myocardium_hus[ax]
-
-# ╔═╡ d23b30da-3002-4e3c-b192-f6448a183e0c
-md"""
-## Bone
-"""
-
-# ╔═╡ b34be066-952e-4691-ac22-30832b19c527
-bone_lacs = μ(Materials.corticalbone, energies)
-
-# ╔═╡ 76d73fb9-4c86-46bc-9b45-c6ec3c19af35
-bone_hus = convert_hu(bone_lacs, energies)
-
-# ╔═╡ 54a60cb3-8b8a-44a4-937a-f4a7b879f22e
-bone_hus[ax]
-
-# ╔═╡ 3cff6264-b496-4fd6-ba40-ae9b7d407b40
-md"""
-## Soft tissue
-"""
-
-# ╔═╡ 07000411-c860-47e5-8331-a52d3c35e1a2
-soft_tissue_lacs = μ(Materials.softtissue, energies)
-
-# ╔═╡ 0ba53139-a282-43d6-aae4-f4e6c89d9a38
-soft_tissue_hus = convert_hu(soft_tissue_lacs, energies)
-
-# ╔═╡ d74f78c9-4928-4688-b1e7-43e34e9862f0
-soft_tissue_hus[ax]
-
-# ╔═╡ e10b6957-8a9b-477c-bb01-d193f7916ab8
-md"""
-## Calcium Inserts
-"""
-
-# ╔═╡ 9909e0e4-1a78-47df-a669-404036265db6
-calcium_lacs = μ(Elements.Calcium, energies)
-
-# ╔═╡ 75c1d3dd-d028-4864-bd18-6f9eadfe2fbb
-const MYOCARDIUM_DENSITY = 1.050g/cm^3
-
-# ╔═╡ 1b6ecad9-e437-4bd3-a4eb-7a12b47fef76
-function calcium_mixture_lac(calcium_concentration)
-	volume_fraction_calcium = calcium_concentration / MYOCARDIUM_DENSITY
-	volume_fraction_myocardium = 1 - volume_fraction_calcium
-	lac_mixture = volume_fraction_calcium * calcium_lacs + volume_fraction_myocardium * myocardium_lacs
-	AxisArray(lac_mixture, axs)
-end
-
-# ╔═╡ ece618a5-e113-4e0a-adb0-d7728aa38c1a
-begin
-	insert_200_lacs = calcium_mixture_lac(0.200g/cm^3)
-	insert_400_lacs = calcium_mixture_lac(0.400g/cm^3)
-	insert_800_lacs = calcium_mixture_lac(0.800g/cm^3)
-end
-
-# ╔═╡ 2e4d535c-8a7b-4e1e-b647-cf1814bb1a71
-begin
-	insert_200_hus = convert_hu(insert_200_lacs, energies)
-	insert_400_hus = convert_hu(insert_400_lacs, energies)
-	insert_800_hus = convert_hu(insert_800_lacs, energies)
-end
-
-# ╔═╡ 3e6c3fd7-9831-47d6-8d0a-8044639373e8
-insert_800_hus[ax]
-
-# ╔═╡ f88ecd50-a99e-481a-8b01-888d097d29c5
-md"""
-# Prepare QRM Phantom
-"""
-
-# ╔═╡ 58b746d1-abce-48c7-b991-3de8db3dafc6
-md"""
-## Thorax
-"""
-
-# ╔═╡ b677c825-fb2c-4266-a5ac-9849bd3b9cdf
-begin
-	# Thorax
-	center = (0mm, 0mm, 0mm)
-	width = (150mm, 100mm, 15mm) # x radius, y radius, height
-	angles = (0, 0, 0)
-	
-	thorax = cylinder(center, width, angles, soft_tissue_hus[ax])
-end;
-
-# ╔═╡ 49388590-772e-4893-a508-e366ea84664f
-md"""
-## Lungs
-"""
-
-# ╔═╡ f0976876-6076-47ab-8fa4-49373f42455a
-begin
-	# Lungs
-	center_left_lung = (-82.5mm, -15mm, center[3])
-	center_right_lung = (82.5mm, -15mm, center[3])
-	
-	width_lung = (27.5mm, 60mm, 15mm)
-
-	angles_right_lung = (π/7, 0, 0)
-	angles_left_lung = (-π/7, 0, 0)
-
-	left_lung = cylinder(center_left_lung, width_lung, angles_right_lung, lung_hus[ax])
-	right_lung = cylinder(center_right_lung, width_lung, angles_left_lung, lung_hus[ax])
-end;
-
-# ╔═╡ 5fc95c85-ffba-4fa0-bdb7-f30972a60049
-md"""
-## Heart
-"""
-
-# ╔═╡ e81b69cc-e86f-408b-93e0-a77e2cefab1a
-begin
-	# Heart
-	width_heart = (40mm, 40mm, 15mm)
-	
-	heart = cylinder(center, width_heart, angles, myocardium_hus[ax])
-end;
-
-# ╔═╡ e2819635-c8f8-48ad-a599-f6426d90dffb
-md"""
-## Spine
-"""
-
-# ╔═╡ b813c1c2-c717-44a4-8b51-d9888f5b8b32
-begin
-	# Spine insert
-	center_spine1 = (0mm, -57mm, 0mm)
-	width_spine1 = (15mm, 15mm, 15mm)
-	center_spine2 = (0mm, -87mm, 0mm)
-	width_spine2 = (22mm, 8mm, 15mm)
-	center_spine3 = (0mm, -74mm, 0mm)
-	width_spine3 = (4mm, 35mm, 15mm)
-	
-	spine1 = cylinder(center_spine1, width_spine1, angles, bone_hus[ax])
-	spine2 = cuboid(center_spine2, width_spine2, (3π/2,0,0), bone_hus[ax])
-	spine3 = cuboid(center_spine3, width_spine3, (3π/2,0,0), bone_hus[ax])
-end;
-
-# ╔═╡ 5ed4bd19-9033-4a0c-82d6-7791d28f8b3b
-md"""
-## Coronary Artery Calcium Inserts
-"""
-
-# ╔═╡ 8dc93793-d453-4dc1-87d2-b49f8a262048
-begin
-	# Small Calcium Inserts (1 mm)
-	width_small_insert = (0.5mm, 0.5mm, 1mm)
-	
-	small_insert_low_density = cylinder((5mm, 5mm, 0mm), width_small_insert, angles, insert_200_hus[ax])
-	small_insert_medium_density = cylinder((-5mm, 5mm, 0mm), width_small_insert, angles, insert_400_hus[ax])
-	small_insert_high_density = cylinder((0mm, -5mm, 0mm), width_small_insert, angles, insert_800_hus[ax])
-end;
-
-# ╔═╡ 48b4fd90-ed1c-43c5-9a2d-fb9ca33183f7
-begin
-	# Medium Calcium Inserts (1 mm)
-	width_medium_insert = (1.5mm, 1.5mm, 3mm)
-	
-	medium_insert_low_density = cylinder((10mm, 10mm, 0mm), width_medium_insert, angles, insert_200_hus[ax])
-	medium_insert_medium_density = cylinder((-10mm, 10mm, 0mm), width_medium_insert, angles, insert_400_hus[ax])
-	medium_insert_high_density = cylinder((0mm, -10mm, 0mm), width_medium_insert, angles, insert_800_hus[ax])
-end;
-
-# ╔═╡ 1b374271-6806-4680-a5d0-0955945af5a6
-begin
-	# Large Calcium Inserts (1 mm)
-	width_large_insert = (2.5mm, 2.5mm, 5mm)
-	
-	large_insert_low_density = cylinder((15mm, 15mm, 0mm), width_large_insert, angles, insert_200_hus[ax])
-	large_insert_medium_density = cylinder((-15mm, 15mm, 0mm), width_large_insert, angles, insert_400_hus[ax])
-	large_insert_high_density = cylinder((0mm, -15mm, 0mm), width_large_insert, angles, insert_800_hus[ax])
-end;
-
-# ╔═╡ 01d958a1-228f-4344-b40b-492506e210d1
-objects = [
-	thorax
-	left_lung
-	right_lung
-	heart
-	spine1
-	spine2
-	spine3
-	small_insert_low_density
-	small_insert_medium_density
-	small_insert_high_density
-	medium_insert_low_density
-	medium_insert_medium_density
-	medium_insert_high_density
-	large_insert_low_density
-	large_insert_medium_density
-	large_insert_high_density
-];
-
-# ╔═╡ 67edb5cf-dda7-4cac-888c-f0c1648a8612
-dims = (300, 300, 20) # odd
-
-# ╔═╡ 3a322442-93bb-447d-a672-831a075d4272
-deltas = (1mm, 1mm, 1mm);
-
-# ╔═╡ de15c717-7d9b-4b47-801a-7e8cf0352cdb
-ig1 = ImageGeom(;dims = dims, deltas = deltas);
-
-# ╔═╡ d152f444-44b3-4f03-baed-8ea67fbd77a7
-Sinograms.axes(ig1)
-
-# ╔═╡ 61c53fb9-867c-48b2-91f6-b32ed721d222
-groundtruth_phantom = phantom(Sinograms.axes(ig1)..., objects);
-
-# ╔═╡ 49a83445-c2f2-4d43-8dcd-343cc73fd88a
-@bind z1 PlutoUI.Slider(Base.axes(groundtruth_phantom, 3); show_value = true, default = div(size(groundtruth_phantom, 3), 2))
-
-# ╔═╡ 55d7b8e6-6330-4039-a617-238a835b0daa
-let
-	f = Figure(resolution=(1200, 1200))
-
-	ax = CairoMakie.Axis(
-		f[1, 1],
-		title="phantom"
-	)
-	hm = CairoMakie.heatmap!(ustrip.(groundtruth_phantom[:, :, z1]); colormap=:grays)
-	Colorbar(f[:, end+1], hm)
-	hidedecorations!(ax, ticks = false, ticklabels = false)
-	f
-end
-
 # ╔═╡ 8b0a6f89-4305-4e55-8f22-49d23629be95
 md"""
-# CT
+# Prepare CT Geometry
 """
 
 # ╔═╡ a8ab1a0b-7729-43b9-9044-d5238846cdf5
@@ -423,11 +114,417 @@ ps_ge_lightspeed = (
 	 dod = 408.075mm,
 )
 
+# ╔═╡ 787d1654-4c19-4d0c-9ee8-06dc461b7a95
+scanner = CtFanArc(;ps_ge_lightspeed...);
+
+# ╔═╡ a24a0b06-2444-410f-846e-9422fcb0b42d
+md"""
+# Prepare Phantom
+"""
+
+# ╔═╡ 1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
+md"""
+## Monoenergetic Materials
+
+The linear attenuation coefficient (often symbolized by the Greek letter μ) of a material describes how much a beam of x-ray or gamma radiation is attenuated (i.e., reduced in intensity) by that material. It is a measure of the probability per unit path length that a photon will interact with the material and lose energy.
+
+The unit of the linear attenuation coefficient is typically inverse length (1/length), such as inverse centimeters (cm⁻¹). A higher value of the linear attenuation coefficient means the material is more effective at attenuating the radiation.
+
+In the context of medical imaging, for example, materials like bone that have high linear attenuation coefficients appear white on an x-ray image because they absorb more of the x-ray photons, while materials like air and soft tissues that have lower coefficients appear darker because more of the x-rays pass through them.
+
+The linear attenuation coefficient depends on the energy of the radiation, as well as the atomic number and density of the material.
+"""
+
+# ╔═╡ ae2e029b-0590-4ed4-911d-9d4a80dea2af
+energies = [80keV, 100keV, 120keV, 135keV]
+
+# ╔═╡ fa5406de-baa2-4f66-b883-2c551ec813b8
+axs = AxisArrays.Axis{:energy}(energies)
+
+# ╔═╡ bb1f98c9-7163-4eaa-a1a5-8e6009a53870
+ax = AxisArrays.Axis{:energy}(100keV)
+
+# ╔═╡ 1e62720c-e9bb-4eec-a7b9-e39e6731c574
+md"""
+### Water
+"""
+
+# ╔═╡ 1fc443ff-39a6-4f82-a582-6aa35ddd064f
+water_lacs = μ(Materials.water, energies)
+
+# ╔═╡ 6deb0f71-a009-4ac0-b48a-ec334280eaec
+function convert_hu(lacs, energies)
+    values = [1000 .* ((lacs[AxisArrays.Axis{:energy}(e)] ./ water_lacs[AxisArrays.Axis{:energy}(e)]) .- 1) for e in energies]
+    AxisArray(values, axs)
+end
+
+# ╔═╡ 2d3c740d-da12-4f61-899e-ee5252e33b48
+water_hus = convert_hu(water_lacs, energies)
+
+# ╔═╡ 8728f157-87c1-4a5e-a376-9f71f9e3d82a
+water_hus[ax]
+
+# ╔═╡ 1f5b5c39-a125-45bd-b046-6f11060c2d78
+md"""
+### Air
+"""
+
+# ╔═╡ 6e3577ae-3ea6-4ce0-9f2d-381111aa05d2
+air_lacs = μ(Materials.air, energies)
+
+# ╔═╡ 9e7cae05-ac89-4ba7-a5c9-2a8e102ecb39
+air_hus = convert_hu(air_lacs, energies)
+
+# ╔═╡ 482c2bf8-1234-4e08-ac2f-7f40dda8a1f4
+air_hus[ax]
+
+# ╔═╡ 5a75e9ae-bd8e-4a15-9690-c00d95749f41
+md"""
+### Lung
+"""
+
+# ╔═╡ 1ed21aef-14bc-49a9-a397-c6c5d15e7c31
+lung_tissue_lacs = μ(Materials.lung, energies)
+
+# ╔═╡ 8c3dcf4f-c3d5-444e-8693-e487e1ed54e5
+lung_lacs = AxisArray((0.75*air_lacs) + (0.25*lung_tissue_lacs), axs)
+
+# ╔═╡ cc2b185d-e8b4-4283-a9d2-5af5755606d0
+lung_hus = convert_hu(lung_lacs, energies)
+
+# ╔═╡ 9a54542a-d333-4b08-ad8e-17be90b8b0fc
+lung_hus[ax]
+
+# ╔═╡ 6719f8e0-1668-4e6e-bcfb-033e9fdf3a01
+md"""
+### Myocardium
+"""
+
+# ╔═╡ 7f1365a6-a73b-40a7-8b4b-bcf52eaf4161
+myocardium_lacs = μ(Materials.muscle, energies)
+
+# ╔═╡ 16ef63ae-76e2-42e0-9e9b-7e48ce4372a0
+myocardium_hus = convert_hu(myocardium_lacs, energies)
+
+# ╔═╡ 90249637-5e97-4d2b-bd80-71fbf0ac3c2d
+myocardium_hus[ax]
+
+# ╔═╡ d23b30da-3002-4e3c-b192-f6448a183e0c
+md"""
+### Bone
+"""
+
+# ╔═╡ b34be066-952e-4691-ac22-30832b19c527
+bone_lacs = μ(Materials.corticalbone, energies)
+
+# ╔═╡ 76d73fb9-4c86-46bc-9b45-c6ec3c19af35
+bone_hus = convert_hu(bone_lacs, energies)
+
+# ╔═╡ 54a60cb3-8b8a-44a4-937a-f4a7b879f22e
+bone_hus[ax]
+
+# ╔═╡ 3cff6264-b496-4fd6-ba40-ae9b7d407b40
+md"""
+### Soft tissue
+"""
+
+# ╔═╡ 07000411-c860-47e5-8331-a52d3c35e1a2
+soft_tissue_lacs = μ(Materials.softtissue, energies)
+
+# ╔═╡ 0ba53139-a282-43d6-aae4-f4e6c89d9a38
+soft_tissue_hus = convert_hu(soft_tissue_lacs, energies)
+
+# ╔═╡ d74f78c9-4928-4688-b1e7-43e34e9862f0
+soft_tissue_hus[ax]
+
+# ╔═╡ e10b6957-8a9b-477c-bb01-d193f7916ab8
+md"""
+### Calcium Inserts
+"""
+
+# ╔═╡ 9909e0e4-1a78-47df-a669-404036265db6
+calcium_lacs = μ(Elements.Calcium, energies)
+
+# ╔═╡ 75c1d3dd-d028-4864-bd18-6f9eadfe2fbb
+const MYOCARDIUM_DENSITY = 1.050g/cm^3
+
+# ╔═╡ 1b6ecad9-e437-4bd3-a4eb-7a12b47fef76
+function calcium_mixture_lac(calcium_concentration)
+	volume_fraction_calcium = calcium_concentration / MYOCARDIUM_DENSITY
+	volume_fraction_myocardium = 1 - volume_fraction_calcium
+	lac_mixture = volume_fraction_calcium * calcium_lacs + volume_fraction_myocardium * myocardium_lacs
+	AxisArray(lac_mixture, axs)
+end
+
+# ╔═╡ ece618a5-e113-4e0a-adb0-d7728aa38c1a
+begin
+	insert_200_lacs = calcium_mixture_lac(0.200g/cm^3)
+	insert_400_lacs = calcium_mixture_lac(0.400g/cm^3)
+	insert_800_lacs = calcium_mixture_lac(0.800g/cm^3)
+end
+
+# ╔═╡ 2e4d535c-8a7b-4e1e-b647-cf1814bb1a71
+begin
+	insert_200_hus = convert_hu(insert_200_lacs, energies)
+	insert_400_hus = convert_hu(insert_400_lacs, energies)
+	insert_800_hus = convert_hu(insert_800_lacs, energies)
+end
+
+# ╔═╡ 3e6c3fd7-9831-47d6-8d0a-8044639373e8
+insert_800_hus[ax]
+
+# ╔═╡ 600f31f5-cb59-409c-92ef-ca1385cfe38d
+md"""
+## Polyenergetic Materials
+"""
+
+# ╔═╡ 1d5102a1-6e7a-44a1-ab8d-c71b40450518
+md"""
+### Load Spectra
+"""
+
+# ╔═╡ 4dc4addd-c371-4cdc-b688-78ec19f1fc8e
+dir_spectra = "/Users/daleblack/Library/CloudStorage/GoogleDrive-djblack@uci.edu/My Drive/dev/Molloilab/phantoms/spectra"
+
+# ╔═╡ a57e0b1c-3d45-4f97-b3ac-61aa05488b03
+function xray_read_spectra_char(dir_spectra, kvp)
+	MM = length(kvp)
+	energies = []
+	spectra = []
+	for i in 1:MM
+		tmp = CSV.read(joinpath(dir_spectra, "spectra_$(kvp[i]).csv"), DataFrame)
+		energy = tmp[:, 1]
+		# The Wilderman/Sukovic spectra must be scaled by energy!
+		spectrum = tmp[:, 2] .* energy
+		push!(energies, energy)
+		push!(spectra, spectrum)
+	end
+	
+	# interpolate onto same energy sampling
+	MM = length(spectra);
+	tmp = zeros(MM, 1)
+	for i in 1:MM
+		tmp[i] = maximum(energies[i])
+	end
+	
+	en = energies[findmax(tmp)[2]]
+	sp = zeros(length(en), MM)
+	for mm in 1:MM
+		extrap = linear_interpolation(energies[mm], spectra[mm], extrapolation_bc = Line())
+		sp[:, mm] = extrap(en) # spectrums
+	end
+	return en, sp 
+end
+
+# ╔═╡ c9678a44-7c39-4544-aeed-c46af49a67fd
+function xray_read_spectra(dir_spectra; kvp = [80, 120, 140])
+	en, sp = xray_read_spectra_char(dir_spectra, kvp)
+	MM = size(sp, 2) # Number of spectra
+	Ide = sp .* vcat(zeros(1, MM), repeat(diff(en), 1, MM)) # (N, M) # Differential spectrum
+	I = sum(Ide) # [1 M] spectrum integral
+	eff_mean = en' * Ide ./ I # mean energy of the incident spectrum.
+	sp_at_eff_mean = zeros(MM)
+	for mm in 1:MM
+		extrap = linear_interpolation(en, sp[:, mm]; extrapolation_bc = 0);
+		sp_at_eff_mean[mm] = extrap(eff_mean[mm])
+	end
+	return en, sp, Ide, I, kvp, sp_at_eff_mean
+end
+
+# ╔═╡ b4a092e9-b04b-489c-aa6c-9e94bfac67c7
+en, sp, Ide, I, kvp, sp_at_eff_mean = xray_read_spectra(dir_spectra; kvp = [80, 100, 140])
+
+# ╔═╡ a4dd04aa-1a51-429a-908b-5bc712def263
+let
+	f = Figure()
+	ax = CairoMakie.Axis(
+		f[1, 1],
+		title = "X-ray Spectra",
+		xlabel = "Energy (kVp)",
+		ylabel = "Photons / mAs-sr per energy bin"
+	)
+	for i in Base.axes(sp, 2)
+		lines!(en, sp[:, i], label = "$(kvp[i]) kVp Spectrum")
+	end
+	axislegend(ax)
+	f
+end
+
+# ╔═╡ a27c7a79-eb7e-4018-bcf4-0fb7ac9f311e
+md"""
+### Convert to HUs
+"""
+
+# ╔═╡ 3e2112e3-5118-4870-9257-a8324dd924d8
+μ_to_hu(μ0) = 1000 * (μ0 - μ_water) / μ_water
+
+# ╔═╡ f88ecd50-a99e-481a-8b01-888d097d29c5
+md"""
+## QRM Geometry
+"""
+
+# ╔═╡ 58b746d1-abce-48c7-b991-3de8db3dafc6
+md"""
+### Thorax
+"""
+
+# ╔═╡ b677c825-fb2c-4266-a5ac-9849bd3b9cdf
+begin
+	# Thorax
+	center = (0mm, 0mm, 0mm)
+	width = (150mm, 100mm, 15mm) # x radius, y radius, height
+	angles = (0, 0, 0)
+	
+	thorax = cylinder(center, width, angles, soft_tissue_hus[ax])
+end;
+
+# ╔═╡ 49388590-772e-4893-a508-e366ea84664f
+md"""
+### Lungs
+"""
+
+# ╔═╡ f0976876-6076-47ab-8fa4-49373f42455a
+begin
+	# Lungs
+	center_left_lung = (-82.5mm, -15mm, center[3])
+	center_right_lung = (82.5mm, -15mm, center[3])
+	
+	width_lung = (27.5mm, 60mm, 15mm)
+
+	angles_right_lung = (π/7, 0, 0)
+	angles_left_lung = (-π/7, 0, 0)
+
+	left_lung = cylinder(center_left_lung, width_lung, angles_right_lung, lung_hus[ax])
+	right_lung = cylinder(center_right_lung, width_lung, angles_left_lung, lung_hus[ax])
+end;
+
+# ╔═╡ 5fc95c85-ffba-4fa0-bdb7-f30972a60049
+md"""
+### Heart
+"""
+
+# ╔═╡ e81b69cc-e86f-408b-93e0-a77e2cefab1a
+begin
+	# Heart
+	width_heart = (40mm, 40mm, 15mm)
+	
+	heart = cylinder(center, width_heart, angles, myocardium_hus[ax])
+end;
+
+# ╔═╡ e2819635-c8f8-48ad-a599-f6426d90dffb
+md"""
+### Spine
+"""
+
+# ╔═╡ b813c1c2-c717-44a4-8b51-d9888f5b8b32
+begin
+	# Spine insert
+	center_spine1 = (0mm, -57mm, 0mm)
+	width_spine1 = (15mm, 15mm, 15mm)
+	center_spine2 = (0mm, -87mm, 0mm)
+	width_spine2 = (22mm, 8mm, 15mm)
+	center_spine3 = (0mm, -74mm, 0mm)
+	width_spine3 = (4mm, 35mm, 15mm)
+	
+	spine1 = cylinder(center_spine1, width_spine1, angles, bone_hus[ax])
+	spine2 = cuboid(center_spine2, width_spine2, (3π/2,0,0), bone_hus[ax])
+	spine3 = cuboid(center_spine3, width_spine3, (3π/2,0,0), bone_hus[ax])
+end;
+
+# ╔═╡ 5ed4bd19-9033-4a0c-82d6-7791d28f8b3b
+md"""
+### Coronary Artery Calcium Inserts
+"""
+
+# ╔═╡ 8dc93793-d453-4dc1-87d2-b49f8a262048
+begin
+	# Small Calcium Inserts (1 mm)
+	width_small_insert = (0.5mm, 0.5mm, 1mm)
+	
+	small_insert_low_density = cylinder((5mm, 5mm, 0mm), width_small_insert, angles, insert_200_hus[ax])
+	small_insert_medium_density = cylinder((-5mm, 5mm, 0mm), width_small_insert, angles, insert_400_hus[ax])
+	small_insert_high_density = cylinder((0mm, -5mm, 0mm), width_small_insert, angles, insert_800_hus[ax])
+end;
+
+# ╔═╡ 48b4fd90-ed1c-43c5-9a2d-fb9ca33183f7
+begin
+	# Medium Calcium Inserts (1 mm)
+	width_medium_insert = (1.5mm, 1.5mm, 3mm)
+	
+	medium_insert_low_density = cylinder((10mm, 10mm, 0mm), width_medium_insert, angles, insert_200_hus[ax])
+	medium_insert_medium_density = cylinder((-10mm, 10mm, 0mm), width_medium_insert, angles, insert_400_hus[ax])
+	medium_insert_high_density = cylinder((0mm, -10mm, 0mm), width_medium_insert, angles, insert_800_hus[ax])
+end;
+
+# ╔═╡ 1b374271-6806-4680-a5d0-0955945af5a6
+begin
+	# Large Calcium Inserts (1 mm)
+	width_large_insert = (2.5mm, 2.5mm, 5mm)
+	
+	large_insert_low_density = cylinder((15mm, 15mm, 0mm), width_large_insert, angles, insert_200_hus[ax])
+	large_insert_medium_density = cylinder((-15mm, 15mm, 0mm), width_large_insert, angles, insert_400_hus[ax])
+	large_insert_high_density = cylinder((0mm, -15mm, 0mm), width_large_insert, angles, insert_800_hus[ax])
+end;
+
+# ╔═╡ 01d958a1-228f-4344-b40b-492506e210d1
+objects = [
+	thorax
+	left_lung
+	right_lung
+	heart
+	spine1
+	spine2
+	spine3
+	small_insert_low_density
+	small_insert_medium_density
+	small_insert_high_density
+	medium_insert_low_density
+	medium_insert_medium_density
+	medium_insert_high_density
+	large_insert_low_density
+	large_insert_medium_density
+	large_insert_high_density
+];
+
+# ╔═╡ 67edb5cf-dda7-4cac-888c-f0c1648a8612
+dims = (300, 300, 20) # odd
+
+# ╔═╡ 3a322442-93bb-447d-a672-831a075d4272
+deltas = (1mm, 1mm, 1mm);
+
+# ╔═╡ de15c717-7d9b-4b47-801a-7e8cf0352cdb
+ig1 = ImageGeom(;dims = dims, deltas = deltas);
+
 # ╔═╡ e3ca9f1b-1543-4b92-804b-b684170cdb70
 ct_geom_plot3(CtFanArc(;ps_ge_lightspeed...), ig1)
 
-# ╔═╡ 787d1654-4c19-4d0c-9ee8-06dc461b7a95
-scanner = CtFanArc(;ps_ge_lightspeed...);
+# ╔═╡ d152f444-44b3-4f03-baed-8ea67fbd77a7
+Sinograms.axes(ig1)
+
+# ╔═╡ 61c53fb9-867c-48b2-91f6-b32ed721d222
+groundtruth_phantom = phantom(Sinograms.axes(ig1)..., objects);
+
+# ╔═╡ 49a83445-c2f2-4d43-8dcd-343cc73fd88a
+@bind z1 PlutoUI.Slider(Base.axes(groundtruth_phantom, 3); show_value = true, default = div(size(groundtruth_phantom, 3), 2))
+
+# ╔═╡ 55d7b8e6-6330-4039-a617-238a835b0daa
+let
+	f = Figure(resolution=(1200, 1200))
+
+	ax = CairoMakie.Axis(
+		f[1, 1],
+		title="phantom"
+	)
+	hm = CairoMakie.heatmap!(ustrip.(groundtruth_phantom[:, :, z1]); colormap=:grays)
+	Colorbar(f[:, end+1], hm)
+	hidedecorations!(ax, ticks = false, ticklabels = false)
+	f
+end
+
+# ╔═╡ 387b30a6-67f6-4fe1-9fca-775473e81a30
+md"""
+# Simulate Scans
+"""
 
 # ╔═╡ 9c6343a7-2d5e-4548-ae16-8fd87af07d03
 md"""
@@ -436,7 +533,7 @@ Using `rays` from Sinograms.jl and `radon` from ImagePhantoms.jl
 """
 
 # ╔═╡ 1eda2628-557a-4b26-ac5a-a5e1448f7518
-projection_data = radon(rays(scanner), objects);
+# projection_data = radon(rays(scanner), objects);
 
 # ╔═╡ fb638c1d-e734-4b21-b32b-0bc7880355e2
 md"""
@@ -488,7 +585,15 @@ end
 # ╔═╡ Cell order:
 # ╠═535aeec6-2037-11ee-2453-e5c6060b1f95
 # ╠═2282b1df-c798-47c9-8e8f-01282dac6de0
-# ╠═1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
+# ╟─8b0a6f89-4305-4e55-8f22-49d23629be95
+# ╟─a8ab1a0b-7729-43b9-9044-d5238846cdf5
+# ╠═14891577-24a3-4507-9e42-1c0c723e11f0
+# ╟─432d5f93-70c1-4985-9f19-b066f4dc77a0
+# ╠═61e34bbc-232f-499d-9343-ea944e76a760
+# ╠═e3ca9f1b-1543-4b92-804b-b684170cdb70
+# ╠═787d1654-4c19-4d0c-9ee8-06dc461b7a95
+# ╟─a24a0b06-2444-410f-846e-9422fcb0b42d
+# ╟─1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
 # ╠═ae2e029b-0590-4ed4-911d-9d4a80dea2af
 # ╠═fa5406de-baa2-4f66-b883-2c551ec813b8
 # ╠═bb1f98c9-7163-4eaa-a1a5-8e6009a53870
@@ -525,6 +630,15 @@ end
 # ╠═ece618a5-e113-4e0a-adb0-d7728aa38c1a
 # ╠═2e4d535c-8a7b-4e1e-b647-cf1814bb1a71
 # ╠═3e6c3fd7-9831-47d6-8d0a-8044639373e8
+# ╟─600f31f5-cb59-409c-92ef-ca1385cfe38d
+# ╟─1d5102a1-6e7a-44a1-ab8d-c71b40450518
+# ╠═4dc4addd-c371-4cdc-b688-78ec19f1fc8e
+# ╠═c9678a44-7c39-4544-aeed-c46af49a67fd
+# ╠═a57e0b1c-3d45-4f97-b3ac-61aa05488b03
+# ╠═b4a092e9-b04b-489c-aa6c-9e94bfac67c7
+# ╟─a4dd04aa-1a51-429a-908b-5bc712def263
+# ╟─a27c7a79-eb7e-4018-bcf4-0fb7ac9f311e
+# ╠═3e2112e3-5118-4870-9257-a8324dd924d8
 # ╟─f88ecd50-a99e-481a-8b01-888d097d29c5
 # ╟─58b746d1-abce-48c7-b991-3de8db3dafc6
 # ╠═b677c825-fb2c-4266-a5ac-9849bd3b9cdf
@@ -546,13 +660,7 @@ end
 # ╠═61c53fb9-867c-48b2-91f6-b32ed721d222
 # ╟─49a83445-c2f2-4d43-8dcd-343cc73fd88a
 # ╟─55d7b8e6-6330-4039-a617-238a835b0daa
-# ╟─8b0a6f89-4305-4e55-8f22-49d23629be95
-# ╟─a8ab1a0b-7729-43b9-9044-d5238846cdf5
-# ╠═14891577-24a3-4507-9e42-1c0c723e11f0
-# ╟─432d5f93-70c1-4985-9f19-b066f4dc77a0
-# ╠═61e34bbc-232f-499d-9343-ea944e76a760
-# ╠═e3ca9f1b-1543-4b92-804b-b684170cdb70
-# ╠═787d1654-4c19-4d0c-9ee8-06dc461b7a95
+# ╟─387b30a6-67f6-4fe1-9fca-775473e81a30
 # ╟─9c6343a7-2d5e-4548-ae16-8fd87af07d03
 # ╠═1eda2628-557a-4b26-ac5a-a5e1448f7518
 # ╟─fb638c1d-e734-4b21-b32b-0bc7880355e2
