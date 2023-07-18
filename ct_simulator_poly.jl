@@ -40,7 +40,26 @@ TableOfContents()
 
 # ╔═╡ 8b0a6f89-4305-4e55-8f22-49d23629be95
 md"""
-# Prepare CT Geometry
+# Prepare Image & CT Geometry
+"""
+
+# ╔═╡ 75b81c11-96a7-41de-a911-f87b0466ef20
+md"""
+## Image Geometry
+"""
+
+# ╔═╡ 67edb5cf-dda7-4cac-888c-f0c1648a8612
+dims = (300, 300, 20)
+
+# ╔═╡ 3a322442-93bb-447d-a672-831a075d4272
+deltas = (1mm, 1mm, 1mm);
+
+# ╔═╡ de15c717-7d9b-4b47-801a-7e8cf0352cdb
+im_geom = ImageGeom(;dims = dims, deltas = deltas);
+
+# ╔═╡ 1bb31f52-1037-43d7-91a3-6f4f818971f8
+md"""
+## CT Geometry
 """
 
 # ╔═╡ a8ab1a0b-7729-43b9-9044-d5238846cdf5
@@ -94,7 +113,7 @@ Units:
 
 # ╔═╡ 432d5f93-70c1-4985-9f19-b066f4dc77a0
 md"""
-## GE Lightspeed System Geometry
+**GE Lightspeed System Geometry**
 doi: 10.1109/TMI.2006.882141
 """
 
@@ -114,17 +133,20 @@ ps_ge_lightspeed = (
 	 dod = 408.075mm,
 )
 
-# ╔═╡ 787d1654-4c19-4d0c-9ee8-06dc461b7a95
-scanner = CtFanArc(;ps_ge_lightspeed...);
+# ╔═╡ e3ca9f1b-1543-4b92-804b-b684170cdb70
+ct_geom_plot3(CtFanArc(;ps_ge_lightspeed...), im_geom)
 
-# ╔═╡ a24a0b06-2444-410f-846e-9422fcb0b42d
+# ╔═╡ 384b4521-9b5d-4214-ac10-77f9c2fc292f
+ct_geom = CtFanArc(;ps_ge_lightspeed...);
+
+# ╔═╡ 5a92e629-b034-4615-91c2-bc3816790898
 md"""
 # Prepare Phantom
 """
 
-# ╔═╡ 1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
+# ╔═╡ 4a764662-5bef-41be-9caa-15212130d4e5
 md"""
-## Monoenergetic Materials
+## Polyenergetic Materials
 
 The linear attenuation coefficient (often symbolized by the Greek letter μ) of a material describes how much a beam of x-ray or gamma radiation is attenuated (i.e., reduced in intensity) by that material. It is a measure of the probability per unit path length that a photon will interact with the material and lose energy.
 
@@ -133,149 +155,6 @@ The unit of the linear attenuation coefficient is typically inverse length (1/le
 In the context of medical imaging, for example, materials like bone that have high linear attenuation coefficients appear white on an x-ray image because they absorb more of the x-ray photons, while materials like air and soft tissues that have lower coefficients appear darker because more of the x-rays pass through them.
 
 The linear attenuation coefficient depends on the energy of the radiation, as well as the atomic number and density of the material.
-"""
-
-# ╔═╡ ae2e029b-0590-4ed4-911d-9d4a80dea2af
-energies = [80keV, 100keV, 120keV, 135keV]
-
-# ╔═╡ fa5406de-baa2-4f66-b883-2c551ec813b8
-axs = AxisArrays.Axis{:energy}(energies)
-
-# ╔═╡ bb1f98c9-7163-4eaa-a1a5-8e6009a53870
-ax = AxisArrays.Axis{:energy}(100keV)
-
-# ╔═╡ 1e62720c-e9bb-4eec-a7b9-e39e6731c574
-md"""
-### Water
-"""
-
-# ╔═╡ 1fc443ff-39a6-4f82-a582-6aa35ddd064f
-water_lacs = μ(Materials.water, energies)
-
-# ╔═╡ 6deb0f71-a009-4ac0-b48a-ec334280eaec
-function convert_hu(lacs, energies)
-    values = [1000 .* ((lacs[AxisArrays.Axis{:energy}(e)] ./ water_lacs[AxisArrays.Axis{:energy}(e)]) .- 1) for e in energies]
-    AxisArray(values, axs)
-end
-
-# ╔═╡ 2d3c740d-da12-4f61-899e-ee5252e33b48
-water_hus = convert_hu(water_lacs, energies)
-
-# ╔═╡ 8728f157-87c1-4a5e-a376-9f71f9e3d82a
-water_hus[ax]
-
-# ╔═╡ 1f5b5c39-a125-45bd-b046-6f11060c2d78
-md"""
-### Air
-"""
-
-# ╔═╡ 6e3577ae-3ea6-4ce0-9f2d-381111aa05d2
-air_lacs = μ(Materials.air, energies)
-
-# ╔═╡ 9e7cae05-ac89-4ba7-a5c9-2a8e102ecb39
-air_hus = convert_hu(air_lacs, energies)
-
-# ╔═╡ 482c2bf8-1234-4e08-ac2f-7f40dda8a1f4
-air_hus[ax]
-
-# ╔═╡ 5a75e9ae-bd8e-4a15-9690-c00d95749f41
-md"""
-### Lung
-"""
-
-# ╔═╡ 1ed21aef-14bc-49a9-a397-c6c5d15e7c31
-lung_tissue_lacs = μ(Materials.lung, energies)
-
-# ╔═╡ 8c3dcf4f-c3d5-444e-8693-e487e1ed54e5
-lung_lacs = AxisArray((0.75*air_lacs) + (0.25*lung_tissue_lacs), axs)
-
-# ╔═╡ cc2b185d-e8b4-4283-a9d2-5af5755606d0
-lung_hus = convert_hu(lung_lacs, energies)
-
-# ╔═╡ 9a54542a-d333-4b08-ad8e-17be90b8b0fc
-lung_hus[ax]
-
-# ╔═╡ 6719f8e0-1668-4e6e-bcfb-033e9fdf3a01
-md"""
-### Myocardium
-"""
-
-# ╔═╡ 7f1365a6-a73b-40a7-8b4b-bcf52eaf4161
-myocardium_lacs = μ(Materials.muscle, energies)
-
-# ╔═╡ 16ef63ae-76e2-42e0-9e9b-7e48ce4372a0
-myocardium_hus = convert_hu(myocardium_lacs, energies)
-
-# ╔═╡ 90249637-5e97-4d2b-bd80-71fbf0ac3c2d
-myocardium_hus[ax]
-
-# ╔═╡ d23b30da-3002-4e3c-b192-f6448a183e0c
-md"""
-### Bone
-"""
-
-# ╔═╡ b34be066-952e-4691-ac22-30832b19c527
-bone_lacs = μ(Materials.corticalbone, energies)
-
-# ╔═╡ 76d73fb9-4c86-46bc-9b45-c6ec3c19af35
-bone_hus = convert_hu(bone_lacs, energies)
-
-# ╔═╡ 54a60cb3-8b8a-44a4-937a-f4a7b879f22e
-bone_hus[ax]
-
-# ╔═╡ 3cff6264-b496-4fd6-ba40-ae9b7d407b40
-md"""
-### Soft tissue
-"""
-
-# ╔═╡ 07000411-c860-47e5-8331-a52d3c35e1a2
-soft_tissue_lacs = μ(Materials.softtissue, energies)
-
-# ╔═╡ 0ba53139-a282-43d6-aae4-f4e6c89d9a38
-soft_tissue_hus = convert_hu(soft_tissue_lacs, energies)
-
-# ╔═╡ d74f78c9-4928-4688-b1e7-43e34e9862f0
-soft_tissue_hus[ax]
-
-# ╔═╡ e10b6957-8a9b-477c-bb01-d193f7916ab8
-md"""
-### Calcium Inserts
-"""
-
-# ╔═╡ 9909e0e4-1a78-47df-a669-404036265db6
-calcium_lacs = μ(Elements.Calcium, energies)
-
-# ╔═╡ 75c1d3dd-d028-4864-bd18-6f9eadfe2fbb
-const MYOCARDIUM_DENSITY = 1.050g/cm^3
-
-# ╔═╡ 1b6ecad9-e437-4bd3-a4eb-7a12b47fef76
-function calcium_mixture_lac(calcium_concentration)
-	volume_fraction_calcium = calcium_concentration / MYOCARDIUM_DENSITY
-	volume_fraction_myocardium = 1 - volume_fraction_calcium
-	lac_mixture = volume_fraction_calcium * calcium_lacs + volume_fraction_myocardium * myocardium_lacs
-	AxisArray(lac_mixture, axs)
-end
-
-# ╔═╡ ece618a5-e113-4e0a-adb0-d7728aa38c1a
-begin
-	insert_200_lacs = calcium_mixture_lac(0.200g/cm^3)
-	insert_400_lacs = calcium_mixture_lac(0.400g/cm^3)
-	insert_800_lacs = calcium_mixture_lac(0.800g/cm^3)
-end
-
-# ╔═╡ 2e4d535c-8a7b-4e1e-b647-cf1814bb1a71
-begin
-	insert_200_hus = convert_hu(insert_200_lacs, energies)
-	insert_400_hus = convert_hu(insert_400_lacs, energies)
-	insert_800_hus = convert_hu(insert_800_lacs, energies)
-end
-
-# ╔═╡ 3e6c3fd7-9831-47d6-8d0a-8044639373e8
-insert_800_hus[ax]
-
-# ╔═╡ 600f31f5-cb59-409c-92ef-ca1385cfe38d
-md"""
-## Polyenergetic Materials
 """
 
 # ╔═╡ 1d5102a1-6e7a-44a1-ab8d-c71b40450518
@@ -350,6 +229,65 @@ let
 	f
 end
 
+# ╔═╡ c5236013-01a9-40cc-a9cc-0641c5028c10
+md"""
+### Line Integrals
+"""
+
+# ╔═╡ a07655e8-85f4-4134-b773-e8966c064eed
+function de_ftab_sls(; sl = [], s_n = [], s_min = [], s_max = [])
+	# number of samples of the material integrals "s"
+	if isempty(s_n)
+		if isempty(sl)
+			s_n = [45 43]
+		else
+			for ll in 1:length(sl)
+				s_n[1, ll] = length(sl[ll]);
+			end
+		end
+	end
+
+	# minimum material "integrals"
+	if isempty(s_min)
+		if isempty(sl)
+			s_min = [0 0]
+		else
+			for ll in 1:length(sl)
+				s_min[1, ll] = minimum(sl[ll])
+			end
+		end
+	end
+
+	# maximum material "integrals"
+	if isempty(s_max)
+		if isempty(sl)
+			# soft max: 50cm * 1g/cc
+			# bone max: 15cm * 2g/cc (for now)
+			s_max = [50 30];
+		else
+			for ll in 1:length(sl)
+				s_max[1, ll] = maximum(sl[ll]);
+			end
+		end
+	end
+
+	if isempty(sl)
+	    for ll in 1:length(s_n)
+	        push!(sl, range(s_min[ll], s_max[ll], length = s_n[ll]))
+	    end
+	end
+
+	return sl, s_n, s_min, s_max
+end
+
+# ╔═╡ 4dff0b84-3036-4879-a04f-854c89880993
+md"""
+### Linear Attenuation Coefficients
+"""
+
+# ╔═╡ 2790df00-ac91-4c25-883f-5343505f8009
+
+
 # ╔═╡ a27c7a79-eb7e-4018-bcf4-0fb7ac9f311e
 md"""
 ### Convert to HUs
@@ -358,9 +296,9 @@ md"""
 # ╔═╡ 3e2112e3-5118-4870-9257-a8324dd924d8
 μ_to_hu(μ0) = 1000 * (μ0 - μ_water) / μ_water
 
-# ╔═╡ f88ecd50-a99e-481a-8b01-888d097d29c5
+# ╔═╡ 7c2b12f7-08b3-4b93-a4b4-635963f793c2
 md"""
-## QRM Geometry
+## QRM Geometry & Materials
 """
 
 # ╔═╡ 58b746d1-abce-48c7-b991-3de8db3dafc6
@@ -486,18 +424,6 @@ objects = [
 	large_insert_high_density
 ];
 
-# ╔═╡ 67edb5cf-dda7-4cac-888c-f0c1648a8612
-dims = (300, 300, 20) # odd
-
-# ╔═╡ 3a322442-93bb-447d-a672-831a075d4272
-deltas = (1mm, 1mm, 1mm);
-
-# ╔═╡ de15c717-7d9b-4b47-801a-7e8cf0352cdb
-ig1 = ImageGeom(;dims = dims, deltas = deltas);
-
-# ╔═╡ e3ca9f1b-1543-4b92-804b-b684170cdb70
-ct_geom_plot3(CtFanArc(;ps_ge_lightspeed...), ig1)
-
 # ╔═╡ d152f444-44b3-4f03-baed-8ea67fbd77a7
 Sinograms.axes(ig1)
 
@@ -586,60 +512,32 @@ end
 # ╠═535aeec6-2037-11ee-2453-e5c6060b1f95
 # ╠═2282b1df-c798-47c9-8e8f-01282dac6de0
 # ╟─8b0a6f89-4305-4e55-8f22-49d23629be95
+# ╟─75b81c11-96a7-41de-a911-f87b0466ef20
+# ╠═67edb5cf-dda7-4cac-888c-f0c1648a8612
+# ╠═3a322442-93bb-447d-a672-831a075d4272
+# ╠═de15c717-7d9b-4b47-801a-7e8cf0352cdb
+# ╟─1bb31f52-1037-43d7-91a3-6f4f818971f8
 # ╟─a8ab1a0b-7729-43b9-9044-d5238846cdf5
 # ╠═14891577-24a3-4507-9e42-1c0c723e11f0
 # ╟─432d5f93-70c1-4985-9f19-b066f4dc77a0
 # ╠═61e34bbc-232f-499d-9343-ea944e76a760
 # ╠═e3ca9f1b-1543-4b92-804b-b684170cdb70
-# ╠═787d1654-4c19-4d0c-9ee8-06dc461b7a95
-# ╟─a24a0b06-2444-410f-846e-9422fcb0b42d
-# ╟─1cd5f63c-36af-4c72-bccd-5c8f25dff3fe
-# ╠═ae2e029b-0590-4ed4-911d-9d4a80dea2af
-# ╠═fa5406de-baa2-4f66-b883-2c551ec813b8
-# ╠═bb1f98c9-7163-4eaa-a1a5-8e6009a53870
-# ╠═6deb0f71-a009-4ac0-b48a-ec334280eaec
-# ╟─1e62720c-e9bb-4eec-a7b9-e39e6731c574
-# ╠═1fc443ff-39a6-4f82-a582-6aa35ddd064f
-# ╠═2d3c740d-da12-4f61-899e-ee5252e33b48
-# ╠═8728f157-87c1-4a5e-a376-9f71f9e3d82a
-# ╟─1f5b5c39-a125-45bd-b046-6f11060c2d78
-# ╠═6e3577ae-3ea6-4ce0-9f2d-381111aa05d2
-# ╠═9e7cae05-ac89-4ba7-a5c9-2a8e102ecb39
-# ╠═482c2bf8-1234-4e08-ac2f-7f40dda8a1f4
-# ╟─5a75e9ae-bd8e-4a15-9690-c00d95749f41
-# ╠═1ed21aef-14bc-49a9-a397-c6c5d15e7c31
-# ╠═8c3dcf4f-c3d5-444e-8693-e487e1ed54e5
-# ╠═cc2b185d-e8b4-4283-a9d2-5af5755606d0
-# ╠═9a54542a-d333-4b08-ad8e-17be90b8b0fc
-# ╟─6719f8e0-1668-4e6e-bcfb-033e9fdf3a01
-# ╠═7f1365a6-a73b-40a7-8b4b-bcf52eaf4161
-# ╠═16ef63ae-76e2-42e0-9e9b-7e48ce4372a0
-# ╠═90249637-5e97-4d2b-bd80-71fbf0ac3c2d
-# ╟─d23b30da-3002-4e3c-b192-f6448a183e0c
-# ╠═b34be066-952e-4691-ac22-30832b19c527
-# ╠═76d73fb9-4c86-46bc-9b45-c6ec3c19af35
-# ╠═54a60cb3-8b8a-44a4-937a-f4a7b879f22e
-# ╟─3cff6264-b496-4fd6-ba40-ae9b7d407b40
-# ╠═07000411-c860-47e5-8331-a52d3c35e1a2
-# ╠═0ba53139-a282-43d6-aae4-f4e6c89d9a38
-# ╠═d74f78c9-4928-4688-b1e7-43e34e9862f0
-# ╟─e10b6957-8a9b-477c-bb01-d193f7916ab8
-# ╠═9909e0e4-1a78-47df-a669-404036265db6
-# ╠═75c1d3dd-d028-4864-bd18-6f9eadfe2fbb
-# ╠═1b6ecad9-e437-4bd3-a4eb-7a12b47fef76
-# ╠═ece618a5-e113-4e0a-adb0-d7728aa38c1a
-# ╠═2e4d535c-8a7b-4e1e-b647-cf1814bb1a71
-# ╠═3e6c3fd7-9831-47d6-8d0a-8044639373e8
-# ╟─600f31f5-cb59-409c-92ef-ca1385cfe38d
+# ╠═384b4521-9b5d-4214-ac10-77f9c2fc292f
+# ╟─5a92e629-b034-4615-91c2-bc3816790898
+# ╟─4a764662-5bef-41be-9caa-15212130d4e5
 # ╟─1d5102a1-6e7a-44a1-ab8d-c71b40450518
 # ╠═4dc4addd-c371-4cdc-b688-78ec19f1fc8e
 # ╠═c9678a44-7c39-4544-aeed-c46af49a67fd
 # ╠═a57e0b1c-3d45-4f97-b3ac-61aa05488b03
 # ╠═b4a092e9-b04b-489c-aa6c-9e94bfac67c7
 # ╟─a4dd04aa-1a51-429a-908b-5bc712def263
+# ╟─c5236013-01a9-40cc-a9cc-0641c5028c10
+# ╠═a07655e8-85f4-4134-b773-e8966c064eed
+# ╟─4dff0b84-3036-4879-a04f-854c89880993
+# ╠═2790df00-ac91-4c25-883f-5343505f8009
 # ╟─a27c7a79-eb7e-4018-bcf4-0fb7ac9f311e
 # ╠═3e2112e3-5118-4870-9257-a8324dd924d8
-# ╟─f88ecd50-a99e-481a-8b01-888d097d29c5
+# ╟─7c2b12f7-08b3-4b93-a4b4-635963f793c2
 # ╟─58b746d1-abce-48c7-b991-3de8db3dafc6
 # ╠═b677c825-fb2c-4266-a5ac-9849bd3b9cdf
 # ╟─49388590-772e-4893-a508-e366ea84664f
@@ -653,9 +551,6 @@ end
 # ╠═48b4fd90-ed1c-43c5-9a2d-fb9ca33183f7
 # ╠═1b374271-6806-4680-a5d0-0955945af5a6
 # ╠═01d958a1-228f-4344-b40b-492506e210d1
-# ╠═67edb5cf-dda7-4cac-888c-f0c1648a8612
-# ╠═3a322442-93bb-447d-a672-831a075d4272
-# ╠═de15c717-7d9b-4b47-801a-7e8cf0352cdb
 # ╠═d152f444-44b3-4f03-baed-8ea67fbd77a7
 # ╠═61c53fb9-867c-48b2-91f6-b32ed721d222
 # ╟─49a83445-c2f2-4d43-8dcd-343cc73fd88a
