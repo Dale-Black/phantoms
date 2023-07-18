@@ -40,26 +40,7 @@ TableOfContents()
 
 # ╔═╡ e4773e40-abf1-4258-a6a1-0cc22b5197e0
 md"""
-# Prepare Image & CT Geometry
-"""
-
-# ╔═╡ deba906f-1b2e-4837-b6ac-b21ca3406a32
-md"""
-## Image Geometry
-"""
-
-# ╔═╡ 66db878d-92de-4c91-be6d-aca295b26736
-dims = (200, 200, 20)
-
-# ╔═╡ b36be38b-0a81-4263-b4c6-39c06ac2ab09
-deltas = (1mm, 1mm, 1mm);
-
-# ╔═╡ b4165662-23c3-4cae-8b9f-2ddef9d65419
-im_geom = ImageGeom(;dims = dims, deltas = deltas);
-
-# ╔═╡ a5f9434b-5bf6-4d02-b2db-f4246d751251
-md"""
-## CT Geometry
+# Prepare CT System
 """
 
 # ╔═╡ fa588cb8-f5e3-4608-8205-77e86d260391
@@ -97,7 +78,7 @@ Units:
 
 # ╔═╡ 530b2399-b6fc-4358-a191-0e840cd1d75a
 md"""
-**GE Lightspeed System Geometry**
+## GE Lightspeed System Geometry
 doi: 10.1109/TMI.2006.882141
 """
 
@@ -116,9 +97,6 @@ ps_ge_lightspeed = (
 	 dsd = 949.075mm,
 	 dod = 408.075mm,
 )
-
-# ╔═╡ c1e35ea8-3e71-48dd-bd9e-e849da794bb6
-ct_geom_plot3(CtFanArc(;ps_ge_lightspeed...), im_geom)
 
 # ╔═╡ cb4d8563-4f20-4739-8a47-1852d47ce161
 ct_geom = CtFanArc(;ps_ge_lightspeed...);
@@ -407,35 +385,64 @@ objects = [
 	large_insert_high_density
 ];
 
+# ╔═╡ 3a291073-5941-4ab9-b9f8-0874b7894532
+md"""
+# Projection, Groundtruth, & Reconstruction
+"""
+
+# ╔═╡ deba906f-1b2e-4837-b6ac-b21ca3406a32
+md"""
+## Get Ground Truth Phantom
+"""
+
+# ╔═╡ 24096cac-8b07-4c4e-8a99-3fd2dcffd5fe
+function generate_axes(width, deltas; offset = 5mm)
+	x = ustrip.(width[1] + offset)
+	Δx = ustrip.(deltas[1])
+
+	y = ustrip.(width[2] + offset)
+	Δy = ustrip.(deltas[2])
+
+	z = ustrip.(width[3] + offset)
+	Δz = ustrip.(deltas[3])
+
+	
+	x_axes = (-x:Δx:x)mm
+	y_axes = (-y:Δy:y)mm
+	z_axes = (-z:Δz:z)mm
+	return (x_axes, y_axes, z_axes)
+end
+
+# ╔═╡ 7be7dd84-6c88-4a8b-a1d7-860091876f58
+groundtruth_axes = generate_axes(width, (0.5mm, 0.5mm, 0.25mm))
+
 # ╔═╡ aeb12303-3b1a-4269-b206-bd639000aff2
-groundtruth_phantom = phantom(Sinograms.axes(im_geom)..., objects);
+groundtruth_phantom = phantom(groundtruth_axes..., objects);
 
 # ╔═╡ 81d5f945-cdde-4219-907e-ca1b32a28384
 @bind z1 PlutoUI.Slider(Base.axes(groundtruth_phantom, 3); show_value = true, default = div(size(groundtruth_phantom, 3), 2))
 
 # ╔═╡ 525dea64-8765-4e8c-8b9c-8ac417a54f4c
 let
-	f = Figure(resolution=(1200, 1200))
+	f = Figure()
 
 	ax = CairoMakie.Axis(
 		f[1, 1],
-		title="phantom"
+		title="Ground Truth Phantom"
 	)
 	hm = CairoMakie.heatmap!(ustrip.(groundtruth_phantom[:, :, z1]); colormap=:grays)
 	Colorbar(f[:, end+1], hm)
 	hidedecorations!(ax, ticks = false, ticklabels = false)
+	
 	f
 end
-
-# ╔═╡ 3a291073-5941-4ab9-b9f8-0874b7894532
-md"""
-# Simulate Scans
-"""
 
 # ╔═╡ f813fe7a-55c1-45ea-87d2-1d69460030d1
 md"""
 ## Get Projection Data
 Using `rays` from Sinograms.jl and `radon` from ImagePhantoms.jl
+
+[Radon Transform](https://en.wikipedia.org/wiki/Radon_transform)
 """
 
 # ╔═╡ 29fada9e-1dcc-4a49-b56d-30ed637c6464
@@ -443,13 +450,27 @@ projection_data = radon(rays(ct_geom), objects);
 
 # ╔═╡ 348dc16b-6bed-4f8d-972b-3e7fe5fa0805
 md"""
-## Reconstruct To Image Data
-Convert from projection data to image data, using filtered-back projection
+## Get Reconstructed Phantom
 """
+
+# ╔═╡ 2274141c-4a54-4095-9bd2-6268a52c2521
+fov = (256mm, 256mm, 160mm) # fov (change this, not dims)
+
+# ╔═╡ b36be38b-0a81-4263-b4c6-39c06ac2ab09
+deltas = (0.5mm, 0.5mm, 0.5mm); # voxel size
+
+# ╔═╡ f7183d3c-73c4-4b97-9e6f-abf6fe43f2a9
+dims = Int.(fov ./ deltas) # number of voxels
+
+# ╔═╡ b4165662-23c3-4cae-8b9f-2ddef9d65419
+im_geom = ImageGeom(;dims = dims, deltas = deltas);
+
+# ╔═╡ c1e35ea8-3e71-48dd-bd9e-e849da794bb6
+ct_geom_plot3(CtFanArc(;ps_ge_lightspeed...), im_geom)
 
 # ╔═╡ 7fedb79d-4c32-4bce-976d-7a54eea1e114
 begin
-	plan = plan_fbp(ct_geom, im_geom; window = Window(Hamming(), 1.0))
+	plan = plan_fbp(ct_geom, im_geom)
 	image_data = fdk(plan, projection_data)
 end;
 
@@ -458,45 +479,27 @@ end;
 
 # ╔═╡ c4677227-f4d8-45cb-9872-992dbfaebe80
 let
-	f = Figure(resolution = (1400, 2000))
-
-	ax = CairoMakie.Axis(
-		f[1, 1],
-		title="Ground Truth Phantom"
-	)
-	CairoMakie.heatmap!(ustrip.(groundtruth_phantom[:, :, z2]); colormap=:grays)
+	f = Figure()
 	
 	ax = CairoMakie.Axis(
-		f[1, 2],
+		f[1, 1],
 		title="Reconstructed Image Data"
 	)
 	CairoMakie.heatmap!(ustrip.(image_data[:, :, z2]); colormap=:grays)
-
-	ax = CairoMakie.Axis(
-		f[2, 1],
-		title="Projection Data"
-	)
-	CairoMakie.heatmap!(ustrip.(projection_data[:, :, z2]); colormap=:grays)
-
-	ax = CairoMakie.Axis(
-		f[2, 2],
-		title="Error"
-	)
-	err = ustrip.(image_data[:, :, z2]) - ustrip.(groundtruth_phantom[:, :, z2])
-	CairoMakie.heatmap!(err; colormap=:grays)
 	
 	f
 end
+
+# ╔═╡ fcb46905-b4e9-40a1-804b-125649664db2
+groundtruth_phantom[308:312, 208:212, 80]
+
+# ╔═╡ aed5db31-dd3d-43d1-8877-1ad929ded06d
+image_data[254:258, 254:258, 160]
 
 # ╔═╡ Cell order:
 # ╠═f8dd85bd-6807-4c6a-a48e-cdde9c0ef307
 # ╠═2b60cd4a-8c2e-4f3d-855d-addf9e2fe8f2
 # ╟─e4773e40-abf1-4258-a6a1-0cc22b5197e0
-# ╟─deba906f-1b2e-4837-b6ac-b21ca3406a32
-# ╠═66db878d-92de-4c91-be6d-aca295b26736
-# ╠═b36be38b-0a81-4263-b4c6-39c06ac2ab09
-# ╠═b4165662-23c3-4cae-8b9f-2ddef9d65419
-# ╟─a5f9434b-5bf6-4d02-b2db-f4246d751251
 # ╟─fa588cb8-f5e3-4608-8205-77e86d260391
 # ╟─530b2399-b6fc-4358-a191-0e840cd1d75a
 # ╠═c8f96410-a7ff-479b-9526-da9b8dbd3947
@@ -554,13 +557,22 @@ end
 # ╠═32bf6b5a-a1c9-4eda-b32c-d7e9907e8f80
 # ╠═b3b197b1-6dca-4351-907e-f65bcd728146
 # ╠═c4204486-6db9-4305-a33c-ee215dcba407
+# ╟─3a291073-5941-4ab9-b9f8-0874b7894532
+# ╟─deba906f-1b2e-4837-b6ac-b21ca3406a32
+# ╠═24096cac-8b07-4c4e-8a99-3fd2dcffd5fe
+# ╠═7be7dd84-6c88-4a8b-a1d7-860091876f58
 # ╠═aeb12303-3b1a-4269-b206-bd639000aff2
 # ╟─81d5f945-cdde-4219-907e-ca1b32a28384
 # ╟─525dea64-8765-4e8c-8b9c-8ac417a54f4c
-# ╟─3a291073-5941-4ab9-b9f8-0874b7894532
 # ╟─f813fe7a-55c1-45ea-87d2-1d69460030d1
 # ╠═29fada9e-1dcc-4a49-b56d-30ed637c6464
 # ╟─348dc16b-6bed-4f8d-972b-3e7fe5fa0805
+# ╠═2274141c-4a54-4095-9bd2-6268a52c2521
+# ╠═b36be38b-0a81-4263-b4c6-39c06ac2ab09
+# ╠═f7183d3c-73c4-4b97-9e6f-abf6fe43f2a9
+# ╠═b4165662-23c3-4cae-8b9f-2ddef9d65419
 # ╠═7fedb79d-4c32-4bce-976d-7a54eea1e114
 # ╟─53512fb1-2cb3-4c7b-a650-34b1a881718d
-# ╠═c4677227-f4d8-45cb-9872-992dbfaebe80
+# ╟─c4677227-f4d8-45cb-9872-992dbfaebe80
+# ╠═fcb46905-b4e9-40a1-804b-125649664db2
+# ╠═aed5db31-dd3d-43d1-8877-1ad929ded06d
